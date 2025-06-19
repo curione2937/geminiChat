@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Gemini Chat">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Gemini Chat Pro</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+</head>
+<body>
+    <div id="app-container" class="app-container">
+        <!-- モバイル用ヘッダー -->
+        <header class="mobile-header">
+            <button id="mobile-menu-btn" class="mobile-menu-btn">
+                <span class="material-symbols-outlined">menu</span>
+            </button>
+            <div class="mobile-header-title">
+                <span id="mobile-current-channel">チャンネル</span>
+                <span class="separator">/</span>
+                <span id="mobile-current-thread">スレッド</span>
+            </div>
+            <button id="mobile-settings-btn" class="mobile-settings-btn">
+                <span class="material-symbols-outlined">settings</span>
+            </button>
+        </header>
+
+        <!-- ネットワーク接続状態表示 -->
+        <div id="network-status" class="network-status" style="display: none;">
+            <span class="material-symbols-outlined">wifi_off</span>
+            ネットワーク接続を確認中...
+        </div>
+
+        <!-- サイドバー -->
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-close-btn-container">
+                <button id="sidebar-close-btn" class="sidebar-close-btn">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="channel-section">
+                <div class="sidebar-header">
+                    <h3>チャンネル</h3>
+                    <button id="new-channel-btn" class="sidebar-action-btn" title="新しいチャンネルを作成">+</button>
+                </div>
+                <ul id="channel-list" class="channel-list"></ul>
+            </div>
+            <div class="thread-section">
+                <div class="sidebar-header">
+                    <h3 id="current-channel-title-in-sidebar">スレッド</h3>
+                    <button id="new-thread-btn" class="sidebar-action-btn" title="新しいスレッドを作成">+</button>
+                </div>
+                <ul id="thread-list" class="thread-list"></ul>
+            </div>
+            <div class="sidebar-footer">
+                <button id="default-settings-btn" class="sidebar-footer-btn">
+                    <span class="material-symbols-outlined">tune</span>
+                    デフォルト設定
+                </button>
+                <button id="import-btn" class="sidebar-footer-btn">
+                    <span class="material-symbols-outlined">upload</span>
+                    インポート
+                </button>
+                <input type="file" id="import-file-input" style="display: none;" accept=".json">
+                <button id="export-btn" class="sidebar-footer-btn">
+                    <span class="material-symbols-outlined">download</span>
+                    エクスポート
+                </button>
+            </div>
+
+        </aside>
+
+        <!-- メインのチャット画面 -->
+        <div class="chat-container">
+            <header class="chat-header">
+                <input type="text" id="current-thread-name-input" class="thread-name-input" placeholder="会話名を入力...">
+                <div class="header-actions">
+                    <span id="search-icon" class="material-symbols-outlined icon-btn" title="全体検索">search</span>
+                </div>
+            </header>
+            <main id="chat-history" class="chat-history"></main>
+            <footer class="chat-footer">
+                <div id="file-attachments-container" class="file-attachments-container" style="display: none;">
+                    <!-- 添付ファイルのプレビューがここに表示される -->
+                </div>
+                <form id="chat-form" class="chat-form">
+                    <button type="button" id="attach-file-btn" class="attach-file-btn" title="ファイルを添付">
+                        <span class="material-symbols-outlined">attach_file</span>
+                    </button>
+                    <input type="file" id="attach-file-input" multiple style="display: none;">
+                    <textarea id="message-input" placeholder="メッセージを入力..." required></textarea>
+                    <button type="submit">送信</button>
+                </form>
+                <div id="loading" class="loading" style="display: none;">AIが応答を生成中...</div>
+            </footer>
+        </div>
+
+        <!-- 設定パネル -->
+        <aside id="settings-panel" class="settings-panel">
+            <div class="settings-panel-header">
+                <h2>チャンネル設定</h2>
+                <button id="settings-close-btn" class="settings-close-btn">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="settings-content">
+                <div class="setting-item">
+                    <label for="channel-name-input">チャンネル名</label>
+                    <input type="text" id="channel-name-input" placeholder="チャンネル名を入力">
+                </div>
+                
+                <!-- API設定セクション -->
+                <hr>
+                <div class="setting-group">
+                    <div class="setting-item-header">
+                        <label>API設定</label>
+                        <button id="api-key-help-btn" class="help-btn" title="APIキーの取得方法">
+                            <span class="material-symbols-outlined">help</span>
+                        </button>
+                    </div>
+                    <div class="setting-item">
+                        <label for="gemini-api-key-input">Gemini API キー</label>
+                        <div class="api-key-input-container">
+                            <input type="password" id="gemini-api-key-input" placeholder="AIza... で始まるAPIキーを入力">
+                            <button type="button" id="api-key-toggle-btn" class="api-key-toggle-btn" title="表示/非表示">
+                                <span class="material-symbols-outlined">visibility</span>
+                            </button>
+                        </div>
+                        <div id="api-key-status" class="api-key-status"></div>
+                        <small class="setting-hint">
+                            APIキーはブラウザ内にのみ保存され、外部に送信されません。
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">
+                                APIキーを取得する
+                            </a>
+                        </small>
+                    </div>
+                </div>
+                
+                <!-- モデル選択セクション -->
+                <hr>
+                <div class="setting-group">
+                    <div class="setting-item-header">
+                        <label>モデル選択</label>
+                        <button id="refresh-models-btn" class="refresh-btn" title="モデル一覧を更新">
+                            <span class="material-symbols-outlined">refresh</span>
+                        </button>
+                    </div>
+                    <select id="model-select" class="model-select">
+                        <option value="">モデルを読み込み中...</option>
+                    </select>
+                    <div class="manual-model-input">
+                        <label class="switch-label">
+                            <input type="checkbox" id="manual-model-toggle">
+                            <span>手動でモデル名を入力</span>
+                        </label>
+                        <input type="text" id="manual-model-input" class="manual-model-input-field" 
+                               placeholder="例: gemini-2.5-pro-preview-06-05" style="display: none;">
+                        <small class="manual-model-hint" style="display: none;">
+                            最新のプレビューモデルなど、リストにないモデル名を直接入力できます
+                        </small>
+                    </div>
+                    <div id="model-info" class="model-info">
+                        <em>モデルを選択してください</em>
+                    </div>
+                </div>
+                
+                <hr>
+                <div class="setting-item">
+                    <label for="stream-toggle">ストリーミング</label>
+                    <label class="switch">
+                        <input type="checkbox" id="stream-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label for="web-search-toggle">Web検索</label>
+                    <label class="switch">
+                        <input type="checkbox" id="web-search-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label for="temperature-slider">Temperature: <span id="temperature-value">0.7</span></label>
+                    <input type="range" id="temperature-slider" min="0" max="1" step="0.1" value="0.7">
+                </div>
+                <div class="setting-item">
+                    <label for="top-p-slider">Top-P: <span id="top-p-value">1.0</span></label>
+                    <input type="range" id="top-p-slider" min="0" max="1" step="0.1" value="1.0">
+                </div>
+                <div class="setting-item">
+                    <label for="top-k-input">Top-K</label>
+                    <input type="number" id="top-k-input" min="1" placeholder="例: 40">
+                </div>
+                <div class="setting-item">
+                    <label for="max-tokens-input">Max Output Tokens</label>
+                    <input type="number" id="max-tokens-input" min="1" placeholder="例: 2048">
+                </div>
+                
+                <!-- チャンネル共有ファイル管理 -->
+                <hr>
+                <div class="setting-group">
+                    <div class="setting-item-header">
+                        <label>チャンネル共有ファイル</label>
+                        <button id="channel-file-upload-btn" class="refresh-btn" title="ファイルをアップロード">
+                            <span class="material-symbols-outlined">upload</span>
+                        </button>
+                    </div>
+                    <input type="file" id="channel-file-input" multiple style="display: none;">
+                    <div id="channel-shared-files-list" class="shared-files-list">
+                        <p class="no-files-message">共有ファイルはありません</p>
+                    </div>
+                    <small class="setting-hint">このチャンネル内の全スレッドで参照できるファイルです</small>
+                </div>
+
+                <!-- システムプロンプト設定（チャンネル共通） -->
+                <hr>
+                <div class="setting-group">
+                    <div class="setting-item-header">
+                        <label>システムプロンプト（チャンネル共通）</label>
+                        <label class="switch">
+                            <input type="checkbox" id="channel-system-prompt-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <textarea id="channel-system-prompt-text" placeholder="AIの役割や応答スタイルを設定してください..."></textarea>
+                </div>
+                
+                <!-- システムプロンプト設定（スレッド個別） -->
+                <div class="setting-group">
+                    <div class="setting-item-header">
+                        <label>システムプロンプト（このスレッド個別）</label>
+                        <label class="switch">
+                            <input type="checkbox" id="thread-system-prompt-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <textarea id="thread-system-prompt-text" placeholder="このスレッド専用のシステムプロンプト..."></textarea>
+                    <small class="setting-hint">有効にするとチャンネル共通設定に追加されます</small>
+                </div>
+
+                <!-- スレッド個別設定 -->
+                <hr>
+                <div class="setting-group">
+                    <h3>スレッド個別設定</h3>
+                    <div class="setting-item">
+                        <label for="use-channel-files-toggle">チャンネル共有ファイルを参照</label>
+                        <label class="switch">
+                            <input type="checkbox" id="use-channel-files-toggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <small class="setting-hint">無効にするとこのスレッドではチャンネル共有ファイルを使用しません</small>
+                </div>
+                
+                <div class="setting-group">
+                    <div class="setting-item-header">
+                        <label>ダミーUserプロンプト</label>
+                        <label class="switch">
+                            <input type="checkbox" id="dummy-user-prompt-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <textarea id="dummy-user-prompt-text" placeholder="..."></textarea>
+                </div>
+                <div class="setting-group">
+                    <div class="setting-item-header">
+                        <label>ダミーModelプロンプト</label>
+                        <label class="switch">
+                            <input type="checkbox" id="dummy-model-prompt-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <textarea id="dummy-model-prompt-text" placeholder="..."></textarea>
+                </div>
+                <hr>
+                <div class="setting-group">
+                    <h2>UI設定</h2>
+                    <div class="ui-setting-item">
+                        <label>背景画像（全体共通）</label>
+                        <div class="preview-container">
+                            <img id="bg-image-preview" class="preview-image" src="">
+                            <button id="clear-bg-image-btn" class="clear-btn" title="背景を削除">×</button>
+                        </div>
+                        <input type="file" id="bg-image-input" accept="image/*">
+                    </div>
+                    <h3>チャンネルのアイコン（共通）</h3>
+                    <div class="ui-setting-item">
+                        <label>ユーザーアイコン</label>
+                        <div class="preview-container">
+                            <img id="channel-user-icon-preview" class="preview-icon" src="">
+                            <button id="clear-channel-user-icon-btn" class="clear-btn" title="アイコンを削除">×</button>
+                        </div>
+                        <input type="file" id="channel-user-icon-input" accept="image/*">
+                    </div>
+                    <div class="ui-setting-item">
+                        <label>モデルアイコン</label>
+                        <div class="preview-container">
+                            <img id="channel-model-icon-preview" class="preview-icon" src="">
+                            <button id="clear-channel-model-icon-btn" class="clear-btn" title="アイコンを削除">×</button>
+                        </div>
+                        <input type="file" id="channel-model-icon-input" accept="image/*">
+                    </div>
+                    <h3>このスレッドのアイコン（個別）</h3>
+                    <div class="setting-item">
+                        <label class="switch-label">
+                            <input type="checkbox" id="override-thread-icons-toggle">
+                            <span>このスレッドで個別設定を有効にする</span>
+                        </label>
+                    </div>
+                    <div id="thread-icon-settings" class="collapsible-section">
+                        <div class="ui-setting-item">
+                            <label>ユーザーアイコン</label>
+                            <div class="preview-container">
+                                <img id="thread-user-icon-preview" class="preview-icon" src="">
+                                <button id="clear-thread-user-icon-btn" class="clear-btn" title="アイコンを削除">×</button>
+                            </div>
+                            <input type="file" id="thread-user-icon-input" accept="image/*">
+                        </div>
+                        <div class="ui-setting-item">
+                            <label>モデルアイコン</label>
+                            <div class="preview-container">
+                                <img id="thread-model-icon-preview" class="preview-icon" src="">
+                                <button id="clear-thread-model-icon-btn" class="clear-btn" title="アイコンを削除">×</button>
+                            </div>
+                            <input type="file" id="thread-model-icon-input" accept="image/*">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- デフォルト設定パネル -->
+        <aside id="default-settings-panel" class="settings-panel">
+            <div class="settings-panel-header">
+                <h2>デフォルト設定</h2>
+                <button id="default-settings-close-btn" class="settings-close-btn">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="settings-content">
+                <div class="setting-info">
+                    <p>新しいチャンネルやスレッドを作成した際の初期設定を変更できます。</p>
+                </div>
+                
+                <h3>新規チャンネルのデフォルト設定</h3>
+                <div class="setting-item">
+                    <label for="default-stream">ストリーミング</label>
+                    <label class="switch">
+                        <input type="checkbox" id="default-stream">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label for="default-use-web-search">Web検索</label>
+                    <label class="switch">
+                        <input type="checkbox" id="default-use-web-search">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label for="default-model-select">デフォルトモデル</label>
+                    <select id="default-model-select" class="model-select">
+                        <option value="">選択しない</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="default-temperature">Temperature: <span id="default-temperature-value">0.7</span></label>
+                    <input type="range" id="default-temperature" min="0" max="1" step="0.1" value="0.7">
+                </div>
+                <div class="setting-item">
+                    <label for="default-top-p">Top-P: <span id="default-top-p-value">1.0</span></label>
+                    <input type="range" id="default-top-p" min="0" max="1" step="0.1" value="1.0">
+                </div>
+                <div class="setting-item">
+                    <label for="default-top-k">Top-K</label>
+                    <input type="number" id="default-top-k" min="1" placeholder="例: 40">
+                </div>
+                <div class="setting-item">
+                    <label for="default-max-tokens">Max Output Tokens</label>
+                    <input type="number" id="default-max-tokens" min="1" placeholder="例: 2048">
+                </div>
+                
+                <!-- チャンネル用システムプロンプト -->
+                <hr>
+                <div class="setting-group">
+                    <div class="setting-item-header">
+                        <label>チャンネル共通システムプロンプト</label>
+                        <label class="switch">
+                            <input type="checkbox" id="default-channel-system-prompt-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <textarea id="default-channel-system-prompt-text" placeholder="新しいチャンネル用のデフォルトシステムプロンプト..."></textarea>
+                </div>
+                
+                <!-- ダミープロンプト設定 -->
+                <div class="setting-group">
+                    <div class="setting-item-header">
+                        <label>ダミーUserプロンプト</label>
+                        <label class="switch">
+                            <input type="checkbox" id="default-dummy-user-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <textarea id="default-dummy-user-text" placeholder="..."></textarea>
+                </div>
+                <div class="setting-group">
+                    <div class="setting-item-header">
+                        <label>ダミーModelプロンプト</label>
+                        <label class="switch">
+                            <input type="checkbox" id="default-dummy-model-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <textarea id="default-dummy-model-text" placeholder="..."></textarea>
+                </div>
+                
+                <hr>
+                <h3>新規スレッドのデフォルト設定</h3>
+                <div class="setting-group">
+                    <div class="setting-item-header">
+                        <label>スレッド個別システムプロンプト</label>
+                        <label class="switch">
+                            <input type="checkbox" id="default-thread-system-prompt-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <textarea id="default-thread-system-prompt-text" placeholder="新しいスレッド用のデフォルトシステムプロンプト..."></textarea>
+                </div>
+                
+                <hr>
+                <div class="setting-actions">
+                    <button id="default-settings-save-btn" class="save-btn">設定を保存</button>
+                    <button id="default-settings-reset-btn" class="reset-btn">デフォルトに戻す</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- モバイル用オーバーレイ -->
+        <div id="mobile-overlay" class="mobile-overlay"></div>
+        
+        <!-- デフォルト設定用オーバーレイ -->
+        <div id="default-settings-overlay" class="default-settings-overlay"></div>
+    </div>
+
+    <!-- ネットワーク設定モーダル -->
+    <div id="network-setup-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>ネットワーク設定</h2>
+                <span id="network-setup-close-btn" class="material-symbols-outlined icon-btn">close</span>
+            </div>
+            <div class="modal-body">
+                <div class="network-setup-content">
+                    <h3>現在の接続状況</h3>
+                    <div id="connection-status">確認中...</div>
+                    
+                    <h3>API URL設定</h3>
+                    <div class="setting-item">
+                        <label for="custom-api-url">カスタムAPI URL</label>
+                        <input type="text" id="custom-api-url" placeholder="http://192.168.1.100:8000">
+                        <small>PCのIPアドレスを入力してください</small>
+                    </div>
+                    
+                    <h3>接続手順</h3>
+                    <ol class="connection-steps">
+                        <li>PCと同じWi-Fiネットワークに接続</li>
+                        <li>PCのIPアドレスを確認（コマンドプロンプトで ipconfig）</li>
+                        <li>上記フィールドに「http://PCのIP:8000」を入力</li>
+                        <li>「接続テスト」ボタンで確認</li>
+                    </ol>
+                </div>
+                <div class="modal-footer">
+                    <button id="save-network-settings-btn" class="modal-btn save-btn">設定を保存</button>
+                    <button id="reset-network-settings-btn" class="modal-btn cancel-btn">リセット</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 既存のモーダルウィンドウ -->
+    <div id="search-modal-overlay" class="modal-overlay" style="display: none;">
+        <div id="search-modal-content" class="modal-content">
+            <div class="modal-header">
+                <h2>全体検索</h2>
+                <span id="search-modal-close-btn" class="material-symbols-outlined icon-btn">close</span>
+            </div>
+            <div class="modal-body">
+                <div class="search-modal-input-container">
+                    <input type="search" id="search-modal-input" placeholder="...">
+                    <button id="search-modal-button">検索</button>
+                </div>
+                <div id="search-results-container" class="search-results-container"></div>
+            </div>
+        </div>
+    </div>
+    <div id="edit-modal-overlay" class="modal-overlay" style="display: none;">
+        <div id="edit-modal-content" class="modal-content">
+            <div class="modal-header">
+                <h2>メッセージを編集</h2>
+                <span id="edit-modal-close-btn" class="material-symbols-outlined icon-btn">close</span>
+            </div>
+            <div class="modal-body">
+                <textarea id="edit-modal-textarea"></textarea>
+                <div class="modal-footer">
+                    <button id="edit-modal-cancel-btn" class="modal-btn cancel-btn">キャンセル</button>
+                    <button id="edit-modal-save-btn" class="modal-btn save-btn">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    
+    <script src="js/main.js" type="module"></script>
+</body>
+</html>
