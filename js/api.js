@@ -375,9 +375,36 @@ export async function fetchAvailableModels() {
             throw new Error('モデルデータの形式が正しくありません');
         }
         
-        // Gemini APIのモデル情報を内部形式に変換
+        // デバッグ: 生のモデルデータをログ出力
+        console.log('🔍 Raw models data:', data.models.length, 'models found');
+        data.models.forEach(model => {
+            console.log(`📋 Model: ${model.name}`, {
+                displayName: model.displayName,
+                supportedGenerationMethods: model.supportedGenerationMethods,
+                description: model.description?.substring(0, 100) + '...'
+            });
+        });
+        
+        // フィルタリング条件を緩和
         const models = data.models
-            .filter(model => model.name && model.supportedGenerationMethods?.includes('generateContent'))
+            .filter(model => {
+                // 基本条件：名前があること
+                if (!model.name) return false;
+                
+                // generateContentまたはstreamGenerateContentをサポートしているもの
+                const supportedMethods = model.supportedGenerationMethods || [];
+                const supportsGeneration = supportedMethods.includes('generateContent') || 
+                                         supportedMethods.includes('streamGenerateContent');
+                
+                // プレビューモデルは特別に許可
+                const isPreviewModel = model.name.includes('preview');
+                
+                // embedding専用モデルは除外
+                const isEmbeddingOnly = model.name.includes('embedding') && 
+                                       !supportedMethods.includes('generateContent');
+                
+                return (supportsGeneration || isPreviewModel) && !isEmbeddingOnly;
+            })
             .map(model => ({
                 name: model.name.replace('models/', ''),
                 display_name: model.displayName || model.name.replace('models/', ''),
@@ -386,9 +413,29 @@ export async function fetchAvailableModels() {
                 input_token_limit: model.inputTokenLimit || 32000,
                 output_token_limit: model.outputTokenLimit || 8192,
                 supported_generation_methods: model.supportedGenerationMethods || ['generateContent']
-            }));
+            }))
+            .sort((a, b) => {
+                // ソート順序: 最新 > Pro > Flash > プレビュー > その他
+                const priority = (name) => {
+                    if (name.includes('latest')) return 1;
+                    if (name.includes('pro')) return 2;
+                    if (name.includes('flash')) return 3;
+                    if (name.includes('preview')) return 4;
+                    return 5;
+                };
+                return priority(a.name) - priority(b.name);
+            });
         
-        console.log('✅ モデル一覧取得完了:', models.length, '個のモデル');
+        console.log('✅ フィルタリング後のモデル一覧:', models.length, '個のモデル');
+        models.forEach(model => {
+            console.log(`✓ ${model.name} (${model.display_name})`);
+        });
+        
+        // 特定のモデルが含まれているかチェック
+        const targetModel = 'gemini-2.5-pro-preview-06-05';
+        const hasTargetModel = models.some(model => model.name === targetModel);
+        console.log(`🎯 ${targetModel} is available:`, hasTargetModel);
+        
         return models;
         
     } catch (error) {
@@ -399,3 +446,65 @@ export async function fetchAvailableModels() {
 
 // APIキー関連の関数をエクスポート
 export { getApiKey, setApiKey, validateApiKey };
+
+// デバッグ用のグローバル関数
+window.debugGeminiModels = async function() {
+    try {
+        console.log('🔍 デバッグ: モデル一覧の詳細確認');
+        const apiKey = getApiKey();
+        if (!apiKey) {
+            console.error('❌ APIキーが設定されていません');
+            return;
+        }
+        
+        const response = await fetch(`${GEMINI_MODELS_URL}?key=${apiKey}`);
+        const data = await response.json();
+        
+        console.log('📋 全モデル一覧:', data.models.length, '個');
+        console.table(data.models.map(model => ({
+            name: model.name.replace('models/', ''),
+            displayName: model.displayName,
+            supportedGenerationMethods: model.supportedGenerationMethods?.join(', '),
+            description: model.description?.substring(0, 50) + '...'
+        })));
+        
+        // 特定モデルの検索
+        const targetModel = 'gemini-2.5-pro-preview-06-05';
+        const found = data.models.find(model => 
+            model.name.includes(targetModel) || model.displayName?.includes(targetModel)
+        );
+        
+        if (found) {
+            console.log('🎯 Target model found:', found);
+        } else {
+            console.log('❌ Target model not found:', targetModel);
+            
+            // 類似モデルを検索
+            const similar = data.models.filter(model => 
+                model.name.includes('2.5') || model.name.includes('preview')
+            );
+            console.log('🔍 Similar models:', similar);
+        }
+        
+        return data.models;
+    } catch (error) {
+        console.error('❌ デバッグエラー:', error);
+    }
+};
+
+// モデル手動追加用の関数
+window.addCustomModel = function(modelName) {
+    console.log(`➕ カスタムモデルを追加: ${modelName}`);
+    const manualToggle = document.getElementById('manual-model-toggle');
+    const manualInput = document.getElementById('manual-model-input');
+    
+    if (manualToggle && manualInput) {
+        manualToggle.checked = true;
+        manualInput.style.display = 'block';
+        manualInput.value = modelName;
+        
+        // 設定更新イベントを発行
+        manualInput.dispatchEvent(new Event('input', { bubbles: true }));
+        console.log('✅ カスタムモデルが設定されました');
+    }
+};
