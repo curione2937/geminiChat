@@ -183,6 +183,14 @@ function convertToGeminiFormat(requestBody) {
                         data: part.inline_data.data
                     }
                 };
+            } else if (part.file) {
+                // 古い形式のfileフィールドをinline_dataに変換
+                return {
+                    inline_data: {
+                        mime_type: part.file.mime_type,
+                        data: part.file.data
+                    }
+                };
             }
             return part;
         });

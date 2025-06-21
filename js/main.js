@@ -1489,7 +1489,7 @@ async function handleFormSubmit(event) {
     console.log(`📎 合計${filesForApi.length}個のファイルをAPIに送信します`);
     clearAttachments();
     
-    const historyForAPI = currentThread.history.slice(0, -1).map(msg => ({ role: msg.role, parts: msg.parts.map(p => p.file ? { inline_data: { mime_type: p.file.mime_type, data: p.file.data } } : { text: p.text }) }));
+    const historyForAPI = currentThread.history.slice(0, -1);
     const requestPayload = { 
         history: historyForAPI, 
         message: userMessageText, 
@@ -1526,7 +1526,7 @@ function handleApiResponse(payload, existingMessageId = null) {
     const apiRequest = {
         history: payload.history,
         message: payload.message,
-        files: payload.files.map(f => ({ mime_type: f.type, data: f.base64 })),
+        files: payload.files.map(f => ({ mime_type: f.type || f.mime_type, data: f.base64 || f.data })),
         stream: payload.config.stream,
         generationConfig: payload.config.generationConfig,
         useWebSearch: payload.config.useWebSearch,
@@ -1884,7 +1884,7 @@ function handleRetry(messageId) {
         }
         
         const textContent = message.parts.filter(p => p.text).map(p => p.text).join("\n\n");
-        const files = message.parts.filter(p => p.file).map(p => ({ base64: p.file.data, type: p.file.mime_type }));
+        const files = message.parts.filter(p => p.file).map(p => ({ data: p.file.data, mime_type: p.file.mime_type }));
         
         if (!textContent && files.length === 0) return;
         
@@ -1917,7 +1917,7 @@ function handleRetry(messageId) {
             const requestPayload = { 
                 history: historyForRetry.slice(0, historyForRetry.lastIndexOf(lastUserMessage)), 
                 message: lastUserMessage.parts.find(p => p.text)?.text || "", 
-                files: lastUserMessage.parts.filter(p => p.file).map(p => ({ base64: p.file.data, type: p.file.mime_type })), 
+                files: lastUserMessage.parts.filter(p => p.file).map(p => ({ data: p.file.data, mime_type: p.file.mime_type })), 
                 config: currentChannel.config,
                 selectedModel: currentChannel.config.selectedModel,
                 systemPrompt: state.getEffectiveSystemPrompt()
